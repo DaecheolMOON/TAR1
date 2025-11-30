@@ -13,6 +13,7 @@ The code is organized into functional groups:
 - **Group 1** – Data preprocessing and TAR1 extraction  
 - **Group 2** – CWT analysis and periodicity detection  
 - **Group 3** – CWT–SVD mode analysis and delta_a computation  
+- **Group 4** – Sample Sequence Summarization and K-mer Cosine Network Analysis  
 
 ---
 
@@ -856,10 +857,257 @@ python compute_delta_a.py /path/to/base_dir \
 * Python 3 (standard library only)
 
 ---
+## 6. Group 4 – Sample sequence summarization and k-mer cosine network analysis
 
-## 6. Example end-to-end workflows
+Group 4 provides post-CWT analysis on the sample sequences extracted in Group 2, and builds a k-mer based cosine similarity network between sequences.
 
-### 6.1 Reference-based subtelomeric periodicity (CHM13)
+Typical flow:
+
+1. Take a run-level CWT summary CSV (for example, summary_runs.csv from Group 2).
+2. Summarize sample_seq usage per chromosome arm and compute arm-level statistics.
+3. Build k-mer vectors from the top sample sequences and compute cosine similarity.
+4. Visualize the similarity network and identify sequence clusters.
+
+The main scripts are:
+
+- batch_cwt_analysis.py
+- cosine_kmer_network.py
+```
+
+### 6.1 Batch CWT summary and arm-level stats (batch_cwt_analysis.py)
+
+Script
+
+- batch_cwt_analysis.py
+
+Description
+
+- Processes one or more CWT summary CSV files (for example summary_runs.csv from cwt_batch_from_fasta.py).
+- Normalizes sample_seq orientation on q-arms by applying reverse complement.
+- Counts how often each sample_seq appears in each chromosome arm (record_id).
+- Builds a pivot table (sample_seq × arm) and several plots.
+- Computes arm-level statistics on end_base (or another numeric column), with optional q-arm correction.
+
+Inputs
+
+- folders (required): one or more folders containing the target CSV file.
+  - Example: CWT result folders such as cwt_results_chm13_30kb
+- --target-filename: CSV filename inside each folder
+  - Default: summary_runs.csv
+- --top-k: number of top sample sequences to keep in the pivot table and rank–frequency plot
+  - Default: 100
+- --top-m: number of top sample sequences to use in the stacked bar plot
+  - Default: 30 (if larger than top-k, it is clipped to top-k)
+
+The target CSV is expected to contain at least the following columns:
+
+- sample_seq: sequence string
+- record_id: chromosome arm or record identifier (for example chr20q)
+- end_base: numeric column used for arm-level statistics
+- signal_type: signal label (for example strong or weak)
+
+Folder naming is used to infer q-arm correction limits:
+
+- If the folder path contains 10000000, a q-arm limit of 10,000,000 bp is used.
+- If the folder path contains 30000, a q-arm limit of 30,000 bp is used.
+
+Main steps
+
+1) Reverse complement for q-arms
+
+- For rows where record_id ends with q, sample_seq is replaced by its reverse complement.
+- This makes p- and q-arm sequences comparable in a unified orientation.
+
+2) Sample sequence frequency and pivot table
+
+- Empty sample_seq entries are dropped.
+- Counts are computed per (sample_seq, record_id) pair.
+- A pivot table is built with sample_seq as rows and record_id as columns.
+- The top top_k sequences (by total count) are kept.
+
+3) Plots
+
+- Rank–frequency line plot:
+  - x-axis: rank of sample_seq (1 to top_k)
+  - y-axis: total count per sequence
+- Stacked bar plot:
+  - x-axis: top_m sequences (sorted by total count)
+  - y-axis: total counts, stacked by record_id
+
+4) Arm-level end_base statistics
+
+- For each record_id:
+  - compute mean, standard deviation, and count of end_base
+- For strong signal only (signal_type == "strong"):
+  - compute the same set of statistics
+- For q-arms, means are corrected as:
+  - mean_corrected = abs(q_arm_limit − mean)
+- Densities are computed as:
+  - density = (mean / count) × 1000.0
+  - density_strong = (mean_strong / count_strong) × 1000.0
+
+Outputs
+
+For each folder, the script produces:
+
+- <target_filename>_top{k}_sample_seqs_by_arm.csv
+  - Pivot table of counts for the top k sample sequences by arm.
+- <target_filename>_rank_freq_lineplot.png
+  - Rank–frequency line plot.
+- <target_filename>_top{m}_stacked_bar.png
+  - Stacked bar plot of the top m sequences by arm.
+- <target_filename>_<target_col>_stats_by_arm.csv
+  - Arm-level statistics for end_base (or another target column), including corrected q-arm means and densities.
+
+Example usage
+
+```bash
+python batch_cwt_analysis.py \
+    --folders cwt_results_chm13_30kb \
+    --target-filename summary_runs.csv \
+    --top-k 100 \
+    --top-m 30
+````
+
+If you have multiple result folders, you can pass them all at once:
+
+```bash
+python batch_cwt_analysis.py \
+    --folders cwt_results_chm13_30kb cwt_results_HG002_30kb \
+    --target-filename summary_runs.csv
+```
+
+Dependencies
+
+* Python 3
+* numpy, pandas, matplotlib
+
+
+
+
+### 6.2 K-mer cosine similarity network (cosine_kmer_network.py)
+
+
+Script
+
+- cosine_kmer_network.py
+
+Description
+
+- Builds k-mer based cosine similarity between sample sequences and performs network and cluster analysis.
+- Typical input is the pivot table produced by batch_cwt_analysis.py
+  (for example summary_runs_top100_sample_seqs_by_arm.csv).
+- Each sequence is converted into a k-mer count vector.
+- Cosine similarity is computed between all pairs of sequences.
+- The script can:
+  - save the full cosine similarity matrix,
+  - extract a top-n submatrix,
+  - draw a similarity network for top-n sequences,
+  - detect clusters based on a similarity threshold and report representative sequences.
+
+Inputs
+
+- --input-csv: path to the input pivot CSV file (required)
+- --k: k-mer size used for vectorization (default: 3)
+- --top-n: number of top sequences (rows) to include in the network and cluster analysis
+  (default: 30, based on the row order of the input CSV)
+- --network-threshold: similarity threshold used to add edges in the network (default: 0.5)
+- --cluster-threshold: similarity threshold used to define clusters via connected components (default: 0.7)
+- --preview-size: size of the similarity matrix preview printed to stdout (default: 10)
+- --top-pairs: number of most similar and least similar pairs to report (default: 10)
+
+The input CSV is expected to contain:
+
+- a column sample_seq (sequence string). If this column is missing, the first column is used.
+- columns whose names start with chr are interpreted as chromosome-arm counts (for example chr20q).
+
+Main steps
+
+1) K-mer vectorization
+
+- All sequences are cleaned by:
+  - converting to uppercase,
+  - keeping only A, C, G and T.
+- For a given k, the full vocabulary of all 4^k k-mers is built.
+- For each sequence, a k-mer count vector is computed and L2-normalized.
+
+2) Full cosine similarity
+
+- Let X be the matrix of k-mer vectors.
+- The cosine similarity matrix S is computed as:
+  - S = X @ X.T
+- The full matrix S is saved as a CSV file.
+- A preview (top-left preview_size × preview_size block) and the top-pairs most similar and least similar pairs are printed.
+
+3) Top-n similarity
+
+- The top-n sequences (by row order) are selected.
+- A top-n submatrix S_top is extracted from S and saved as a CSV file.
+- Top pair statistics are printed again for S_top.
+
+4) Network construction and visualization
+
+- A NetworkX graph is built with one node per sequence (top-n).
+- An undirected edge is added between sequences i and j if S_top[i, j] ≥ network_threshold.
+- Edge width and transparency are scaled by similarity.
+- A spring_layout is used to draw the network.
+- The figure is saved as a PNG.
+
+5) Cluster analysis
+
+- A second graph G_cluster is built using cluster_threshold as the edge threshold.
+- Connected components in G_cluster are treated as clusters.
+
+For each cluster, the script can:
+
+- identify a representative sequence:
+  - the sequence with the highest average similarity to other members in the cluster,
+- summarize how many chromosome arms (chr columns) are associated with the cluster,
+  either:
+  - per representative sequence (basic analysis), or
+  - summed over all members (full-arms analysis).
+
+Outputs
+
+Given an input CSV "pivot.csv" and k = 3, top-n = 30, the script produces:
+
+- pivot_cosine_k3.csv
+  - full cosine similarity matrix for all sequences.
+- pivot_cosine_k3_top30.csv
+  - top-30 submatrix of the cosine similarity.
+- pivot_network_k3_top30_thr0.5.png
+  - similarity network for the top-30 sequences with edges above the network threshold.
+- Console output:
+  - preview of the similarity matrix,
+  - lists of most similar and least similar pairs,
+  - cluster membership and representative sequences,
+  - counts of associated chromosome arms for each cluster.
+
+Example usage
+
+```bash
+python cosine_kmer_network.py \
+    --input-csv summary_runs_top100_sample_seqs_by_arm.csv \
+    --k 3 \
+    --top-n 30 \
+    --network-threshold 0.5 \
+    --cluster-threshold 0.7
+
+
+**Dependencies**
+
+* Python 3
+* numpy, pandas, matplotlib, networkx
+
+
+
+
+
+---
+
+## 7. Example end-to-end workflows
+
+### 7.1 Reference-based subtelomeric periodicity (CHM13)
 
 1. Extract chromosome-arm ends:
 
@@ -899,7 +1147,7 @@ python V004_fasta_to_scalogram_ver2.py \
 
 ---
 
-### 6.2 Human sample mode comparison (CHM13 vs HG002m vs Karimian)
+### 7.2 Human sample mode comparison (CHM13 vs HG002m vs Karimian)
 
 1. Prepare subtelomeric arm FASTA for CHM13 and HG002m (e.g. using `extract_chrom_ends.py`).
 2. Prepare read-level FASTA for HG002_karimian.
@@ -917,7 +1165,7 @@ The script will generate U/V mode plots for CHM13 and HG002m, V modes for Karimi
 
 ---
 
-### 6.3 Primate TAR1 mode comparison
+### 7.3 Primate TAR1 mode comparison
 
 1. Prepare TAR1 block FASTA for each primate (e.g. orangutan, bonobo, chimpanzee).
 2. Run primate mode analysis:
@@ -934,7 +1182,7 @@ This will generate U/V mode plots for each species, enabling qualitative compari
 
 ---
 
-### 6.4 delta_a extraction for downstream statistics
+### 7.4 delta_a extraction for downstream statistics
 
 Assuming each sample directory contains a TAR1 block FASTA (`tar1_blocks.fa`):
 
@@ -969,6 +1217,48 @@ You can then use `delta_a_summary.csv` in downstream statistical analyses
 (e.g. correlation with epigenetic marks, doubling time, ALT vs telomerase status, etc.).
 
 ````
+
+### 7.5 Post-CWT sample sequence and k-mer cosine network analysis
+
+Starting from the CWT run-level summary produced in Section 6.1:
+
+1) Build sample-sequence pivot tables and arm-level statistics
+
+```bash
+python batch_cwt_analysis.py \
+    --folders cwt_results_chm13_30kb \
+    --target-filename summary_runs.csv \
+    --top-k 100 \
+    --top-m 30
+````
+
+This will create, inside cwt_results_chm13_30kb:
+
+* summary_runs_top100_sample_seqs_by_arm.csv
+* summary_runs_rank_freq_lineplot.png
+* summary_runs_top30_stacked_bar.png
+* summary_runs_end_base_stats_by_arm.csv
+
+2). Compute k-mer cosine similarity and build a sequence network
+
+```bash
+python cosine_kmer_network.py \
+    --input-csv cwt_results_chm13_30kb/summary_runs_top100_sample_seqs_by_arm.csv \
+    --k 3 \
+    --top-n 30 \
+    --network-threshold 0.5 \
+    --cluster-threshold 0.7
+```
+
+This will generate:
+
+* a full cosine similarity matrix,
+* a top-30 cosine similarity submatrix,
+* a PNG network diagram for the top-30 sequences,
+* cluster summaries printed to the console.
+
+````
+
 
 ---
 
