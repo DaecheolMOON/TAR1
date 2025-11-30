@@ -1092,7 +1092,7 @@ python cosine_kmer_network.py \
     --top-n 30 \
     --network-threshold 0.5 \
     --cluster-threshold 0.7
-
+```
 
 **Dependencies**
 
