@@ -872,7 +872,7 @@ The main scripts are:
 
 - batch_cwt_analysis.py
 - cosine_kmer_network.py
-```
+
 
 ### 6.1 Batch CWT summary and arm-level stats (batch_cwt_analysis.py)
 
@@ -1260,8 +1260,5 @@ This will generate:
 ````
 
 
----
-
-If you need to extend the pipeline (e.g. add more species, change CWT scales, or integrate new summary metrics), the existing scripts are modular and can be adapted by adjusting parameters or adding new CLI options.
 
 
