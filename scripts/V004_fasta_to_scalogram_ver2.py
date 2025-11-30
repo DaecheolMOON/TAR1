@@ -1,108 +1,169 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+TAR1 repeat SVD analysis (read-level, Mode 2 only, adaptive scale ≤ 800 bp)
+
+1) k-mer count signal  → CWT
+2) raw energy matrix   → SVD
+3) Mode 2 scale-loading plot + two leading peak positions
+"""
+
 import numpy as np
 import pywt
-import matplotlib.pyplot as plt
-from collections import Counter
-from numpy.linalg import svd
-import os
-import argparse
 from Bio import SeqIO
+import matplotlib.pyplot as plt
+import os
+from collections import Counter
+import argparse
+from scipy.signal import find_peaks
 
-def analyze_sequence(seq, read_id, output_dir):
-    """
-    Analyze a single FASTA read: generate k-mer signal, compute CWT scalogram, 
-    perform SVD on raw coefficients, and save plots.
-    Usage example:
-      python fasta_to_scalogram_svd.py \
-        --input_fasta path/to/reads.fasta \
-        --output_dir path/to/output
-    """
-    print(f"--- Processing read: {read_id} ---")
+# ───── global parameters ──────────────────────────────────────────
+KMER_K          = 20
+MODES           = [2]           # Mode 2 only
+INIT_MIN_SCALE  = 200
+INIT_MAX_SCALE  = 430
+MAX_ALLOWED     = 800           # hard ceiling
+STEP_EXTEND     = 20            # step for extension
+PEAK_DIST       = 50            # min distance between peaks
+PEAK_HEIGHT     = 0.05          # relative threshold
+# ──────────────────────────────────────────────────────────────────
 
-    # 1. k-mer signal generation (k=20)
-    k = 20
-    if len(seq) < k:
-        print(f"Warning: sequence '{read_id}' shorter than k={k}. Skipping.")
+
+def compute_cwt_matrix(seq: str, scales: np.ndarray) -> np.ndarray:
+    """Return |CWT| coefficients summed over positions for given scales."""
+    kmers = [seq[i:i + KMER_K] for i in range(len(seq) - KMER_K + 1)]
+    counts = Counter(kmers)
+    signal = np.array([counts[k] for k in kmers])
+    coeffs, _ = pywt.cwt(signal, scales, 'morl', method='fft')
+    return np.abs(coeffs)               # shape: (n_scales, len(signal))
+
+
+def ensure_two_peaks(vector: np.ndarray,
+                     scales: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return (peak_indices, peak_scales) ensuring ≥2 peaks if possible."""
+    peaks, _ = find_peaks(np.abs(vector),
+                          distance=PEAK_DIST,
+                          height=PEAK_HEIGHT)
+    return peaks, scales[peaks]
+
+
+def analyze_single_fasta(fasta_path: str, output_dir: str) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"\n==== {os.path.basename(fasta_path)} → {output_dir}")
+
+    # 1) load FASTA
+    reads = {rec.id: str(rec.seq).upper()
+             for rec in SeqIO.parse(fasta_path, "fasta")}
+    if not reads:
+        print("[WARN] empty FASTA, skip")
         return
-    kmers = [seq[i:i+k] for i in range(len(seq) - k + 1)]
-    freq = Counter(kmers)
-    signal = np.array([freq[kmer] for kmer in kmers])
 
-    # 2. Continuous Wavelet Transform (scales 100-400)
-    scales = np.arange(100, 401)
-    coeffs, freqs = pywt.cwt(signal, scales, 'morl')
+    # 2) adaptive CWT–SVD loop
+    max_scale = INIT_MAX_SCALE
+    peak_scales = None
+    final_scales = None
+    U = S = Vt = None
 
-    # 3. Plot and save scalogram
-    plt.figure(figsize=(10, 6))
-    plt.imshow(np.abs(coeffs), aspect='auto', interpolation='nearest', origin='lower',
-               extent=[0, len(signal), scales[0], scales[-1]])
-    plt.xlabel('Sequence Position')
-    plt.ylabel('Wavelet Scale')
-    plt.title(f'Scalogram of Repeat Intensity for {read_id}')
-    scalogram_path = os.path.join(output_dir, f"{read_id}_scalogram.png")
-    plt.savefig(scalogram_path)
-    plt.close()
-    print(f"Saved scalogram to: {scalogram_path}")
+    while max_scale <= MAX_ALLOWED:
+        scales = np.arange(INIT_MIN_SCALE, max_scale + 1)
+        cwt_sum = []
+        processed_ids = []
 
-    # 4. Prepare data matrix for SVD (use magnitude of coefficients)
-    #    F matrix of shape (num_scales, signal_length)
-    F = np.abs(coeffs)
+        for rid, seq in reads.items():
+            if len(seq) <= max_scale + KMER_K:
+                continue
+            mat = compute_cwt_matrix(seq, scales)
+            cwt_sum.append(mat.sum(axis=1))
+            processed_ids.append(rid)
 
-    # 5. Perform SVD: F = U * S * Vt
-    U, S, Vt = svd(F, full_matrices=False)
+        if not processed_ids:
+            print("[ERROR] no reads long enough, abort")
+            return
 
-    # 6. Plot top-3 basis functions (scale modes)
-    plt.figure(figsize=(8, 4))
-    for i in range(min(3, len(S))):
-        plt.plot(scales, U[:, i], label=f'Basis {i+1} (σ={S[i]:.1f})')
-    plt.xlabel('Wavelet Scale (100–400)')
-    plt.ylabel('Basis Value')
-    plt.title(f'Top-3 Basis Functions from SVD for {read_id}')
-    plt.legend()
-    basis_path = os.path.join(output_dir, f"{read_id}_svd_basis.png")
-    plt.savefig(basis_path)
-    plt.close()
-    print(f"Saved SVD basis functions to: {basis_path}")
+        M = np.vstack(cwt_sum)
+        try:
+            U, S, Vt = np.linalg.svd(M, full_matrices=False)
+        except np.linalg.LinAlgError as e:
+            print(f"[ERROR] SVD failed: {e}")
+            return
 
-    # 7. Plot top-3 components (position modes)
-    x = np.arange(len(signal))
-    plt.figure(figsize=(8, 4))
-    for i in range(min(3, len(S))):
-        plt.plot(x, Vt[i, :], label=f'Component {i+1} (σ={S[i]:.1f})')
-    plt.xlabel('Sequence Position')
-    plt.ylabel('Component Value')
-    plt.title(f'Top-3 Components from SVD for {read_id}')
-    plt.legend()
-    components_path = os.path.join(output_dir, f"{read_id}_svd_components.png")
-    plt.savefig(components_path)
-    plt.close()
-    print(f"Saved SVD components to: {components_path}\n")
+        vec = Vt[MODES[0] - 1]           # Mode 2 vector
+        peaks, p_scales = ensure_two_peaks(vec, scales)
+
+        if len(peaks) >= 2:
+            peak_scales = p_scales[:2]   # first two peaks
+            final_scales = scales
+            break
+
+        max_scale += STEP_EXTEND         # extend range and retry
+
+    if peak_scales is None:
+        print("[WARN] <2 peaks even at max range, analysis continues with "
+              f"{len(peaks)} peak(s)")
+        peak_scales = p_scales
+        final_scales = scales
+
+    # 3) report peak positions
+    print(f"[INFO] Mode 2 peaks: {peak_scales.tolist()} bp")
+
+    # 4) save summary file
+    summary_path = os.path.join(output_dir, "mode2_peak_summary.txt")
+    with open(summary_path, 'w') as f:
+        f.write(f"Mode 2 peaks (bp): {', '.join(map(str, peak_scales))}\n")
+    print(f"[OUT] summary → {summary_path}")
+
+    # 5) save plot
+    plt.style.use('seaborn-v0_8-whitegrid')
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.plot(final_scales, vec, '.', lw=1, color='royalblue', label='Mode 2')
+    for idx, p in enumerate(peak_scales):
+        ax.axvline(p, color='red', ls='--', alpha=0.8,
+                   label=f'Peak {idx + 1}: {p} bp' if idx == 0 else None)
+
+    ax.set_title(f"Mode 2 scale-loading\n{os.path.basename(fasta_path)}")
+    ax.set_xlabel("Scale (bp)")
+    ax.set_ylabel("Loading")
+    ax.set_xlim(final_scales[0], final_scales[-1])
+    ax.grid(True, ls=':')
+    ax.legend()
+    plt.tight_layout()
+    plot_path = os.path.join(output_dir, "mode2_scale_loading.png")
+    plt.savefig(plot_path, dpi=300)
+    plt.close(fig)
+    print(f"[OUT] plot → {plot_path}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Analyze repeats in FASTA sequences using CWT and SVD, then save plots."
-    )
-    parser.add_argument(
-        "--input_fasta",
-        type=str,
-        required=True,
-        help="Path to input FASTA file containing one or more reads."
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        required=True,
-        help="Directory where output plots will be saved."
-    )
-    args = parser.parse_args()
+def main() -> None:
+    argp = argparse.ArgumentParser(
+        description="Batch TAR1 SVD (read-level, Mode 2 only, adaptive scale)")
+    argp.add_argument("--base_dir", required=True,
+                      help="Directory containing SRRC*/tar1_blocks.fa")
+    args = argp.parse_args()
 
-    os.makedirs(args.output_dir, exist_ok=True)
-    print(f"Output directory ensured at: {args.output_dir}")
+    base_dir = args.base_dir
+    fasta_name = "tar1_blocks.fa"
+    out_dir_name = "Y002_430"
 
-    for record in SeqIO.parse(args.input_fasta, "fasta"):
-        read_id = record.id
-        seq = str(record.seq).upper().replace("\n", "").replace(" ", "")
-        analyze_sequence(seq, read_id, args.output_dir)
+    count = 0
+    for sub in sorted(os.listdir(base_dir)):
+        if not sub.startswith("SRRC"):
+            continue
+        srr_dir = os.path.join(base_dir, sub)
+        fasta_path = os.path.join(srr_dir, fasta_name)
+        if not os.path.isfile(fasta_path):
+            continue
+        count += 1
+        try:
+            analyze_single_fasta(fasta_path,
+                                 os.path.join(srr_dir, out_dir_name))
+        except Exception as err:
+            print(f"[ERROR] {fasta_path}: {err}")
+
+    if count == 0:
+        print("No matching FASTA files found.")
+    else:
+        print(f"Batch complete: {count} FASTA processed.")
+
 
 if __name__ == "__main__":
     main()

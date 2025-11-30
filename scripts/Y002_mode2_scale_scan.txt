@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Read-level TAR1 Mode 2 SVD analysis with adaptive scale search.
+
+For each sample directory containing a TAR1 block FASTA (e.g. tar1_blocks.fa),
+this script:
+
+1) builds a k-mer count signal per read,
+2) computes a CWT-based energy matrix across scales,
+3) performs SVD on the read × scale energy matrix,
+4) extracts the Mode 2 scale-loading vector,
+5) adaptively extends the maximum scale until at least two Mode 2 peaks
+   are detected (or until a hard ceiling),
+6) saves:
+   - Mode 2 peak positions in bp (mode2_peak_summary.txt),
+   - Mode 2 scale-loading plot (mode2_scale_loading.png).
+
+This output is intended to be used by `compute_delta_a.py`.
+"""
+
+import os
+import argparse
+from collections import Counter
+from typing import Tuple
+
+import numpy as np
+import pywt
+from Bio import SeqIO
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
+
+# ───── global parameters (can be made CLI options if needed) ─────
+KMER_K         = 20
+MODES          = [2]      # Use Mode 2 only
+INIT_MIN_SCALE = 200
+INIT_MAX_SCALE = 430
+MAX_ALLOWED    = 800      # hard ceiling for scale search
+STEP_EXTEND    = 20       # step size when extending the scale range
+PEAK_DIST      = 50       # minimum distance between peaks (in scale units)
+PEAK_HEIGHT    = 0.05     # relative height threshold for peak detection
+# ─────────────────────────────────────────────────────────────────
+
+
+def compute_cwt_matrix(seq: str, scales: np.ndarray) -> np.ndarray:
+    """
+    Compute the absolute CWT coefficient matrix for a given sequence.
+
+    The sequence is converted into a k-mer count signal, and the continuous
+    wavelet transform (CWT) is applied using a Morlet wavelet.
+
+    Returns
+    -------
+    coeffs_abs : np.ndarray
+        Array of shape (n_scales, n_positions) containing |CWT| coefficients.
+    """
+    kmers = [seq[i : i + KMER_K] for i in range(len(seq) - KMER_K + 1)]
+    counts = Counter(kmers)
+    signal = np.array([counts[k] for k in kmers], dtype=float)
+    coeffs, _ = pywt.cwt(signal, scales, "morl", method="fft")
+    return np.abs(coeffs)
+
+
+def ensure_two_peaks(
+    vector: np.ndarray, scales: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Detect peaks in a scale-loading vector.
+
+    Parameters
+    ----------
+    vector : np.ndarray
+        Scale-loading vector (e.g. a row of V^T from SVD).
+    scales : np.ndarray
+        Array of scales corresponding to entries in `vector`.
+
+    Returns
+    -------
+    peaks : np.ndarray
+        Indices of detected peaks in `vector`.
+    peak_scales : np.ndarray
+        Scale values corresponding to the detected peaks.
+    """
+    peaks, _ = find_peaks(
+        np.abs(vector),
+        distance=PEAK_DIST,
+        height=PEAK_HEIGHT,
+    )
+    return peaks, scales[peaks]
+
+
+def analyze_single_fasta(fasta_path: str, output_dir: str) -> None:
+    """
+    Perform Mode 2 SVD analysis for a single TAR1 block FASTA.
+
+    Parameters
+    ----------
+    fasta_path : str
+        Path to a FASTA file containing TAR1 reads/blocks.
+    output_dir : str
+        Output directory where summary and plot files will be written.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"\n==== Analyzing {os.path.basename(fasta_path)} → {output_dir}")
+
+    # 1) Load FASTA
+    reads = {rec.id: str(rec.seq).upper() for rec in SeqIO.parse(fasta_path, "fasta")}
+    if not reads:
+        print("[WARN] Empty FASTA, skipping.")
+        return
+
+    # 2) Adaptive CWT–SVD loop over scale range
+    max_scale = INIT_MAX_SCALE
+    peak_scales = None
+    final_scales = None
+    mode2_vector = None
+    last_peaks = np.array([], dtype=int)
+    last_scales = None
+
+    while max_scale <= MAX_ALLOWED:
+        scales = np.arange(INIT_MIN_SCALE, max_scale + 1)
+        cwt_energy_rows = []
+        processed_ids = []
+
+        for rid, seq in reads.items():
+            # Only consider reads long enough for the largest scale + k-mer
+            if len(seq) <= max_scale + KMER_K:
+                continue
+            coeffs_abs = compute_cwt_matrix(seq, scales)
+            # Sum |CWT| across positions → energy per scale
+            cwt_energy_rows.append(coeffs_abs.sum(axis=1))
+            processed_ids.append(rid)
+
+        if not processed_ids:
+            print("[ERROR] No reads long enough for scale range "
+                  f"{INIT_MIN_SCALE}-{max_scale} bp, aborting.")
+            return
+
+        M = np.vstack(cwt_energy_rows)
+
+        try:
+            U, S, Vt = np.linalg.svd(M, full_matrices=False)
+        except np.linalg.LinAlgError as e:
+            print(f"[ERROR] SVD failed: {e}")
+            return
+
+        # Mode 2 vector in scale space
+        mode2_vector = Vt[MODES[0] - 1]
+        peaks, p_scales = ensure_two_peaks(mode2_vector, scales)
+
+        last_peaks = peaks
+        last_scales = p_scales
+
+        if len(peaks) >= 2:
+            peak_scales = p_scales[:2]  # first two peaks
+            final_scales = scales
+            break
+
+        max_scale += STEP_EXTEND  # extend scale range and retry
+
+    if peak_scales is None:
+        # Fallback: use whatever peaks we found at the last iteration
+        print(
+            "[WARN] <2 peaks even at max scale range; "
+            f"analysis continues with {len(last_peaks)} peak(s)."
+        )
+        peak_scales = last_scales
+        final_scales = scales
+
+    # 3) Report peak positions
+    if peak_scales is not None:
+        print(f"[INFO] Mode 2 peaks (bp): {peak_scales.tolist()}")
+    else:
+        print("[WARN] No Mode 2 peaks detected.")
+        peak_scales = np.array([], dtype=int)
+
+    # 4) Save summary file
+    summary_path = os.path.join(output_dir, "mode2_peak_summary.txt")
+    with open(summary_path, "w") as f:
+        if len(peak_scales) > 0:
+            f.write(f"Mode 2 peaks (bp): {', '.join(map(str, peak_scales))}\n")
+        else:
+            f.write("Mode 2 peaks (bp):\n")
+    print(f"[OUT] Summary → {summary_path}")
+
+    # 5) Save Mode 2 scale-loading plot
+    if mode2_vector is not None and final_scales is not None:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(final_scales, mode2_vector, ".", lw=1, label="Mode 2")
+
+        for idx, p in enumerate(peak_scales):
+            ax.axvline(
+                p,
+                color="red",
+                linestyle="--",
+                alpha=0.8,
+                label=f"Peak {idx + 1}: {p} bp" if idx == 0 else None,
+            )
+
+        ax.set_title(
+            f"Mode 2 scale-loading\n{os.path.basename(fasta_path)}", fontsize=14
+        )
+        ax.set_xlabel("Scale (bp)", fontsize=12)
+        ax.set_ylabel("Loading", fontsize=12)
+        ax.set_xlim(final_scales[0], final_scales[-1])
+        ax.grid(True, linestyle=":", alpha=0.7)
+        ax.legend()
+        plt.tight_layout()
+
+        plot_path = os.path.join(output_dir, "mode2_scale_loading.png")
+        plt.savefig(plot_path, dpi=300)
+        plt.close(fig)
+        print(f"[OUT] Plot → {plot_path}")
+    else:
+        print("[WARN] Skipping plot: no valid Mode 2 vector or scale grid.")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Read-level TAR1 Mode 2 SVD analysis with adaptive scale search. "
+            "For each sample subdirectory, this script looks for a FASTA file "
+            "(e.g. tar1_blocks.fa), computes CWT-based Mode 2 scale-loading, "
+            "detects peak scales, and saves a summary + plot under an "
+            "output subdirectory (e.g. Y002_430)."
+        )
+    )
+    parser.add_argument(
+        "--base_dir",
+        required=True,
+        help="Base directory containing sample subdirectories.",
+    )
+    parser.add_argument(
+        "--sample-prefix",
+        default="",
+        help=(
+            "Optional prefix of sample directory names. "
+            "If provided, only directories starting with this prefix are used "
+            "(e.g. JH, SRR). Default: process all subdirectories."
+        ),
+    )
+    parser.add_argument(
+        "--fasta-name",
+        default="tar1_blocks.fa",
+        help="FASTA filename inside each sample directory (default: tar1_blocks.fa).",
+    )
+    parser.add_argument(
+        "--output-subdir",
+        default="Y002_430",
+        help=(
+            "Subdirectory name where output files will be written inside each "
+            "sample directory (default: Y002_430)."
+        ),
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    base_dir = args.base_dir
+    sample_prefix = args.sample_prefix
+    fasta_name = args.fasta_name
+    out_dir_name = args.output_subdir
+
+    if not os.path.isdir(base_dir):
+        print(f"[ERROR] Base directory not found: {base_dir}")
+        return
+
+    count = 0
+    for sub in sorted(os.listdir(base_dir)):
+        sub_path = os.path.join(base_dir, sub)
+        if not os.path.isdir(sub_path):
+            continue
+        if sample_prefix and not sub.startswith(sample_prefix):
+            continue
+
+        fasta_path = os.path.join(sub_path, fasta_name)
+        if not os.path.isfile(fasta_path):
+            continue
+
+        count += 1
+        try:
+            analyze_single_fasta(
+                fasta_path,
+                os.path.join(sub_path, out_dir_name),
+            )
+        except Exception as err:
+            print(f"[ERROR] {fasta_path}: {err}")
+
+    if count == 0:
+        print("No matching FASTA files processed.")
+    else:
+        print(f"Batch complete: {count} FASTA file(s) processed.")
+
+
+if __name__ == "__main__":
+    main()

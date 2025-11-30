@@ -1,0 +1,16 @@
+cutoff,total_sequences,unique_arms_with_sequence,arms_list
+10000,2,2,chr5p;chr6q
+20000,26,26,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+30000,27,27,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18p;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+50000,27,27,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18p;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+70000,28,27,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18p;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+100000,29,27,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18p;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+200000,29,27,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18p;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+500000,30,27,chr10p;chr10q;chr11q;chr13q;chr14q;chr15q;chr16q;chr18p;chr18q;chr1p;chr20p;chr21q;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+1000000,38,32,chr10p;chr10q;chr11q;chr12p;chr13p;chr13q;chr14q;chr15p;chr15q;chr16q;chr17p;chr18p;chr18q;chr1p;chr20p;chr21q;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq
+2000000,45,35,chr10p;chr10q;chr11q;chr12p;chr13p;chr13q;chr14q;chr15p;chr15q;chr16p;chr16q;chr17p;chr18p;chr18q;chr1p;chr20p;chr21q;chr22p;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq;chrYq
+3000000,46,36,chr10p;chr10q;chr11q;chr12p;chr13p;chr13q;chr14p;chr14q;chr15p;chr15q;chr16p;chr16q;chr17p;chr18p;chr18q;chr1p;chr20p;chr21q;chr22p;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq;chrYq
+5000000,47,37,chr10p;chr10q;chr11q;chr12p;chr13p;chr13q;chr14p;chr14q;chr15p;chr15q;chr16p;chr16q;chr17p;chr18p;chr18q;chr1p;chr1q;chr20p;chr21q;chr22p;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq;chrYq
+7000000,49,37,chr10p;chr10q;chr11q;chr12p;chr13p;chr13q;chr14p;chr14q;chr15p;chr15q;chr16p;chr16q;chr17p;chr18p;chr18q;chr1p;chr1q;chr20p;chr21q;chr22p;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq;chrYq
+10000000,49,37,chr10p;chr10q;chr11q;chr12p;chr13p;chr13q;chr14p;chr14q;chr15p;chr15q;chr16p;chr16q;chr17p;chr18p;chr18q;chr1p;chr1q;chr20p;chr21q;chr22p;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq;chrYq
+100000000,65,38,chr10p;chr10q;chr11p;chr11q;chr12p;chr13p;chr13q;chr14p;chr14q;chr15p;chr15q;chr16p;chr16q;chr17p;chr18p;chr18q;chr1p;chr1q;chr20p;chr21q;chr22p;chr23p;chr23q;chr2q;chr3p;chr4p;chr4q;chr5p;chr5q;chr6q;chr7p;chr7q;chr8p;chr8q;chr9p;chr9q;chrXq;chrYq
