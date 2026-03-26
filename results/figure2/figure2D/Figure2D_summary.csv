@@ -1,0 +1,2 @@
+chrom,window_start_bp,window_end_bp,window_len_bp,n_tar1_fragments,raw_signal_len,downsample_factor,signal_len_after_downsampling,kmer_stride_bp,effective_stride_bp,optimal_scale_ds,optimal_scale_bp,plot_path
+chr13,5249145,17249145,12000000,5,24000,2,12000,500,1000,383.0,383000.0,results/figure2/figure2D/Figure2D_human_chr13_centromere.png

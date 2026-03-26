@@ -1,0 +1,7 @@
+panel	species	arm	window_bp	note
+F2A1	human	chr3p	30000	Human 30 kb example
+F2A2	human	chr17p	500000	Human 500 kb example
+F2A3	human	chr13p	10000000	Human 10 Mb example
+F2A4	chimp	chr4q	30000	Chimpanzee 30 kb example
+F2A5	chimp	chr20q	10000000	Chimpanzee 10 Mb example
+F2A6	gorilla	chr16q	10000000	Gorilla 10 Mb example

@@ -1,0 +1,8 @@
+panel	species	record_id	match_mode	use_for_cwt	use_for_motif	note
+F1C	human	chr20q	contains	1	0	Human CHM13 representative CWT locus
+F1D	human	chr20q	contains	0	1	Human CHM13 representative motif locus
+F1E	human	chr3p	contains	0	1	Representative motif-rich example
+F1F	human	chr17p	contains	0	1	Representative motif-depleted example 1
+F1G	human	chr8p	contains	0	1	Representative motif-depleted example 2
+F1H	gorilla	chr2p	contains	0	1	Gorilla motif profile representative locus
+F1I	gorilla	chr2p	contains	1	0	Gorilla CWT representative locus

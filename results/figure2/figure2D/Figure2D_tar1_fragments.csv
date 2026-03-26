@@ -1,0 +1,6 @@
+chrom,start,end,strand,rep_name,rep_class_family,local_start,local_end
+chr13,9404669,9405275,+,TAR1,Satellite/subtelo,4155524,4156130
+chr13,10451877,10452476,C,TAR1,Satellite/subtelo,5202732,5203331
+chr13,12720213,12720265,C,TAR1,Satellite/subtelo,7471068,7471120
+chr13,12721279,12721775,+,TAR1,Satellite/subtelo,7472134,7472630
+chr13,12800196,12800833,C,TAR1,Satellite/subtelo,7551051,7551688

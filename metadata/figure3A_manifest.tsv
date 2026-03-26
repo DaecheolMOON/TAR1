@@ -1,0 +1,6 @@
+panel	species	arm	analysis_bp	note
+F3A1	human	chr3p	30000	Proximal example
+F3A2	chimp	chr4q	30000	Proximal example
+F3A3	human	chr13p	500000	Distal example
+F3A4	chimp	chr20q	500000	Distal example
+F3A5	gorilla	chr16q	500000	Distal example

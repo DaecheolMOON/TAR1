@@ -1,0 +1,3 @@
+panel,species,record_id,seq_id,sequence_length,signal_length,dominant_scale,primary_mean,primary_max,plot_path
+F1C,human,chr20q,chr20q:3152-4565,1414,1395,400.0,34.28382182367408,72.9026792971321,results/figure1/cwt/F1C_human_chr20q_scalogram.png
+F1I,gorilla,chr2p,chr2p:9786325-9787542|merged_n=2|seq_len=1219,1219,1200,399.0,26.468102034424536,62.21709518829736,results/figure1/cwt/F1I_gorilla_chr2p_scalogram.png

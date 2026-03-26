@@ -1,0 +1,6 @@
+panel,species,arm,analysis_bp,n_strong_runs,n_weak_runs,median_strong_atcg,n_tar1_intervals,plot_path,events_csv
+F3A1,human,chr3p,30000,6,12,0.9523809523809523,1,results/figure3/figure3A/plots/F3A1_human_chr3p_30000bp_atcg.png,results/figure3/figure3A/events/F3A1_human_chr3p_30000bp_events.csv
+F3A2,chimp,chr4q,30000,28,59,1.0,1,results/figure3/figure3A/plots/F3A2_chimp_chr4q_30000bp_atcg.png,results/figure3/figure3A/events/F3A2_chimp_chr4q_30000bp_events.csv
+F3A3,human,chr13p,500000,664,2174,3.4444444444444446,0,results/figure3/figure3A/plots/F3A3_human_chr13p_500000bp_atcg.png,results/figure3/figure3A/events/F3A3_human_chr13p_500000bp_events.csv
+F3A4,chimp,chr20q,500000,171,1283,1.8571428571428572,0,results/figure3/figure3A/plots/F3A4_chimp_chr20q_500000bp_atcg.png,results/figure3/figure3A/events/F3A4_chimp_chr20q_500000bp_events.csv
+F3A5,gorilla,chr16q,500000,663,1875,1.8571428571428572,0,results/figure3/figure3A/plots/F3A5_gorilla_chr16q_500000bp_atcg.png,results/figure3/figure3A/events/F3A5_gorilla_chr16q_500000bp_events.csv

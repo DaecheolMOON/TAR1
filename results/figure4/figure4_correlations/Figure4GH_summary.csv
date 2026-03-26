@@ -1,0 +1,3 @@
+panel,n,method,x,y,r,p,exclude
+G,9,Pearson,Lower_quartile_bp,Doubling_Time,-0.8703286202985023,0.002272118862492574,HOS
+H,10,Spearman,delta_a,Lower_quartile_bp,0.6484848484848483,0.04254012768448945,

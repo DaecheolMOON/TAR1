@@ -1,0 +1,7 @@
+panel,species,arm,window_bp,raw_signal_len,signal_len_after_processing,downsample_factor,kmer_stride_bp,effective_stride_bp,n_tar1_intervals,best_scale,plot_path
+F2A1,human,chr3p,30000,29981,29981,1,1,1,1,400,results/figure2/figure2A/plots/F2A1_human_chr3p_30000bp_scalogram.png
+F2A2,human,chr17p,500000,499981,499981,1,1,1,1,400,results/figure2/figure2A/plots/F2A2_human_chr17p_500000bp_scalogram.png
+F2A3,human,chr13p,10000000,20000,20000,1,500,500,1,388,results/figure2/figure2A/plots/F2A3_human_chr13p_10000000bp_scalogram.png
+F2A4,chimp,chr4q,30000,29981,29981,1,1,1,1,336,results/figure2/figure2A/plots/F2A4_chimp_chr4q_30000bp_scalogram.png
+F2A5,chimp,chr20q,10000000,20000,20000,1,500,500,0,349,results/figure2/figure2A/plots/F2A5_chimp_chr20q_10000000bp_scalogram.png
+F2A6,gorilla,chr16q,10000000,20000,20000,1,500,500,2,397,results/figure2/figure2A/plots/F2A6_gorilla_chr16q_10000000bp_scalogram.png
